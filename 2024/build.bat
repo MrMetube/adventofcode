@@ -1,0 +1,1 @@
+odin build . -out:./build/advent.exe -debug -error-pos-style:unix
