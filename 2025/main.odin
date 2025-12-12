@@ -13,16 +13,16 @@ main :: proc() {
     days := [?]Day{
         Completed{ 1, day01, "Secret Entrance", "zeros ended on", "zeros passed"},
         Completed{ 2, day02, "Gift Shop", "simple invalid ids", "repeated invalid ids"},
-        Todo{{ 3, day03, "", "", ""}, false, false},
-        Todo{{ 4, day04, "", "", ""}, false, false},
-        Todo{{ 5, day05, "", "", ""}, false, false},
-        Todo{{ 6, day06, "", "", ""}, false, false},
-        Todo{{ 7, day07, "", "", ""}, false, false},
-        Todo{{ 8, day08, "", "", ""}, false, false},
-        Todo{{ 9, day09, "", "", ""}, false, false},
-        Todo{{10, day10, "", "", ""}, false, false},
-        Todo{{11, day11, "", "", ""}, false, false},
-        Todo{{12, day12, "", "", ""}, false, false},
+        Completed{ 3, day03, "Lobby", "total 2 joltage", "total 12 joltage"},
+        Todo{ Completed{ 4, day04, "Printing Department", "", ""}, false, false},
+        Todo{ Completed{ 5, day05, "", "", ""}, false, false},
+        Todo{ Completed{ 6, day06, "", "", ""}, false, false},
+        Todo{ Completed{ 7, day07, "", "", ""}, false, false},
+        Todo{ Completed{ 8, day08, "", "", ""}, false, false},
+        Todo{ Completed{ 9, day09, "", "", ""}, false, false},
+        Todo{ Completed{10, day10, "", "", ""}, false, false},
+        Todo{ Completed{11, day11, "", "", ""}, false, false},
+        Todo{ Completed{12, day12, "", "", ""}, false, false},
     }
 
     init_qpc()
@@ -47,9 +47,8 @@ main :: proc() {
 }
 
 dayXX :: proc(path, test_path: string) -> (part1, part2: i64) {
-    line, ok := read_file(path when !ODIN_DEBUG else test_path)
-    assert(auto_cast ok)
-
+    line := read_file(path when !ODIN_DEBUG else test_path)
+    
     return
 }
 
@@ -63,12 +62,139 @@ day08 :: dayXX
 day07 :: dayXX
 day06 :: dayXX
 day05 :: dayXX
-day04 :: dayXX
-day03 :: dayXX
+day04 :: proc(path, test_path: string) -> (part1, part2: i64) {
+    lines := read_lines(path when !ODIN_DEBUG else test_path)
+    
+    PaperRoll :: enum {
+        Empty, Present, Reachable
+    }
+    
+    cols := len(lines)
+    rows := len(lines[0])
+    paper_rolls := make([] PaperRoll, cols * rows)
+    for line, row in lines {
+        for slot, col in line {
+            paper_rolls[row * cols + col] = slot == '@' ? .Present : .Empty
+        }
+    }
+    
+    print_rolls :: proc (paper_rolls: [] PaperRoll, rows, cols: int) {
+        for row in 0..<rows {
+            for col in 0..<cols {
+                switch paper_rolls[row * cols + col] {
+                case .Present:   fmt.print('@')
+                case .Empty:     fmt.print(' ')
+                case .Reachable: fmt.print('x')
+                }
+            }
+            fmt.print('\n')
+        }
+        fmt.print('\n')
+    }
+    
+    count_neighbours :: proc (paper_rolls: [] PaperRoll, rows, cols: int, row, col: int) -> (result: i64) {
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                if dx == 0 && dy == 0 do continue
+                
+                x := row + dx
+                y := col + dy
+                if in_bounds_2D(x, y, rows, cols) {
+                    if paper_rolls[x * cols + y] != .Empty {
+                        result += 1
+                    }
+                }
+            }
+        }
+        return result
+    }
+    
+    first := true
+    for {
+        defer first = false
+        for row in 0..<rows {
+            for col in 0..<cols {
+                roll := &paper_rolls[row * cols + col]
+                
+                if roll^ == .Present {
+                    neighbour_count := count_neighbours(paper_rolls, rows, cols, row, col)
+                    if neighbour_count < 4 {
+                        roll ^= .Reachable
+                        if first do part1 += 1
+                        part2 += 1
+                    }
+                }
+            }
+        }
+        
+        made_progress := false
+        for &roll in paper_rolls {
+            if roll == .Reachable {
+                roll = .Empty
+                made_progress = true
+            }
+        }
+        
+        if !made_progress do break
+    }
+    
+    return
+}
+
+day03 :: proc(path, test_path: string) -> (max_2_joltage, max_12_joltage: i64) {
+    lines := read_lines(path when !ODIN_DEBUG else test_path)
+    
+    row: [dynamic] i64
+    for line in lines {
+        if len(line) == 0 do break
+        clear(&row)
+        
+        for r in line {
+            assert(r != '\r' && r != '\n')
+            append(&row, cast(i64) (r-'0'))
+        }
+        
+        get_highest_digit :: proc (row: [] i64) -> (result: i64, index: i64) {
+            for it, it_index in row {
+                if result < it {
+                    result = it
+                    index = auto_cast it_index
+                }
+                if result == 9 do break
+            }
+            
+            return result, index
+        }
+        
+        max_joltage: i64
+        digits: [12] i64
+        find_max_joltage :: proc (digits: [] i64, row: [] i64) -> (result: i64) {
+            cursor: i64 
+            cc: i64
+            
+            #reverse for &digit, digit_index in digits {
+                digit, cc = get_highest_digit(row[cursor:len(row)-digit_index])
+                cursor += cc + 1
+            }
+            
+            factor: i64 = 1
+            for digit in digits {
+                result += digit * factor
+                factor *= 10
+            }
+            
+            return result
+        }
+        
+        max_2_joltage += find_max_joltage(digits[:2], row[:])
+        max_12_joltage += find_max_joltage(digits[:12], row[:])
+    }
+    
+    return
+}
 
 day02 :: proc(path, test_path: string) -> (simple_invalid_id_sum, repeated_invalid_id_sum: i64) {
-    line, ok := read_file(path when !ODIN_DEBUG else test_path)
-    assert(auto_cast ok)
+    line := read_file(path when !ODIN_DEBUG else test_path)
     
     add_space :: proc (s: i64, space: i64) -> i64 {
         result := s
@@ -126,8 +252,7 @@ day02 :: proc(path, test_path: string) -> (simple_invalid_id_sum, repeated_inval
 }
 
 day01 :: proc(path, test_path:string) -> (zeros_ended_on, zeros_passed: i64){
-    lines, ok := read_lines(path when !ODIN_DEBUG else test_path)
-    assert(auto_cast ok)
+    lines := read_lines(path when !ODIN_DEBUG else test_path)
     
     current: i64 =  50
     for line in lines {

@@ -23,6 +23,9 @@ count_digits :: proc (value: $T) -> (result: T) {
 // ---------------------- array functions
 // ---------------------- ---------------------- ----------------------
 
+in_bounds_2D :: proc (x,y: int, rows, cols: int) -> bool {
+    return x >= 0 && x < rows && y >= 0 && y < cols
+}
 
 insert :: proc(array: ^[dynamic]$T, element: T, index: int) {
     resize(array, len(array)+1)
@@ -209,16 +212,16 @@ is_numeric :: proc(r: rune) -> bool {
     }
 }
 
-read_file :: proc(file: string) -> (result: string, success: bool) {
+read_file :: proc(file: string) -> (result: string) {
 	data, ok := os.read_entire_file(file)
-	if !ok do return {}, false
-	return string(data), true
+    assert(ok)
+	return string(data)
 }
 
-read_lines :: proc(file: string) -> (result: []string, success: bool) {
+read_lines :: proc(file: string) -> (result: []string) {
 	data, ok := os.read_entire_file(file)
-	if !ok do return nil, false
-	return strings.split_lines(string(data)), true
+    assert(ok)
+	return strings.split_lines(string(data))
 }
 
 
