@@ -16,7 +16,7 @@ main :: proc() {
         Completed{ 3, day03, "Lobby", "total 2 joltage", "total 12 joltage"},
         Completed{ 4, day04, "Printing Department", "accessable paper rolls", "removable paper rolls"},
         Completed{ 5, day05, "Cafeteria", "fresh ingredients", "possibly fresh ingridients"},
-        Todo{ Completed{ 6, day06, "", "", ""}, false, false},
+        Completed{ 6, day06, "Trash Compactor", "regular grand total", "cephalopod grand total"},
         Todo{ Completed{ 7, day07, "", "", ""}, false, false},
         Todo{ Completed{ 8, day08, "", "", ""}, false, false},
         Todo{ Completed{ 9, day09, "", "", ""}, false, false},
@@ -48,6 +48,7 @@ main :: proc() {
 
 dayXX :: proc(path, test_path: string) -> (part1, part2: i64) {
     line := read_file(path when !ODIN_DEBUG else test_path)
+    lines := read_lines(path when !ODIN_DEBUG else test_path)
     
     return
 }
@@ -60,7 +61,68 @@ day10 :: dayXX
 day09 :: dayXX
 day08 :: dayXX
 day07 :: dayXX
-day06 :: dayXX
+
+day06 :: proc(path, test_path: string) -> (grand_total, cephalopod_total: i64) {
+    lines := read_lines(path when !ODIN_DEBUG else test_path)
+    
+    { // part 1
+        rests := make([]string, len(lines))
+        defer delete(rests)
+        copy(rests[:], lines)
+        
+        outer: for {
+            for &line in rests {
+                line = trim_left(line)
+                if line == "" do break outer
+            }
+            
+            op := len(rests)-1
+            assert(rests[op][0] == '*' || rests[op][0] == '+')
+            is_multiply := rests[op][0] == '*'
+            rests[op] = rests[op][1:]
+            
+            result: i64 = is_multiply ? 1 : 0 
+            for &line in rests[:op] {
+                num: i64
+                num, line = chop_number(line)
+                result = is_multiply ? result * num : result + num
+            }
+            grand_total += result
+        }
+    }
+    
+    { // part 2
+        x := 0
+        for x < len(lines[0]) {
+            y := len(lines)-1
+            assert(lines[y][x] == '*' || lines[y][x] == '+')
+            is_multiply := lines[y][x] == '*'
+            
+            result: i64 = is_multiply ? 1 : 0
+            for x < len(lines[0]) {
+                factor: i64 = 1
+                num: i64
+                for y := len(lines)-2; y >= 0; y-=1 {
+                    if is_numeric(cast(rune) lines[y][x]) {
+                        digit := cast(i64) lines[y][x] - '0'
+                        num += factor * digit
+                        factor *= 10
+                    }
+                }
+                
+                if num == 0 do break
+                
+                result = is_multiply ? result * num : result + num
+                x += 1
+            }
+            
+            cephalopod_total += result
+            x += 1
+        }
+    }
+    
+    return
+}
 
 day05 :: proc(path, test_path: string) -> (fresh_count, possibly_fresh_count: i64) {
     lines := read_lines(path when !ODIN_DEBUG else test_path)

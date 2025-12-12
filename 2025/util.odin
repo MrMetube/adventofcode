@@ -97,7 +97,7 @@ chop_digit :: proc(view: ^string) -> (result: i64) {
     return
 }
 
-chop_number :: proc(view: string) -> (result: i64, rest:string) {
+chop_number :: proc(view: string) -> (result: i64, rest: string) {
     view := trim_left(view)
     cut := 0
     for r in view {
