@@ -7,15 +7,15 @@ import "core:strconv"
 
 Completed :: struct { num: int, func: proc(_,_:string)->(i64,i64), name, label1, label2: string }
 Todo      :: struct { using _: Completed, done1, done2: bool }
-Day       :: union{ Completed, Todo }
+Day       :: union  { Completed, Todo }
 
 main :: proc() {
     days := [?]Day{
         Completed{ 1, day01, "Secret Entrance", "zeros ended on", "zeros passed"},
         Completed{ 2, day02, "Gift Shop", "simple invalid ids", "repeated invalid ids"},
         Completed{ 3, day03, "Lobby", "total 2 joltage", "total 12 joltage"},
-        Todo{ Completed{ 4, day04, "Printing Department", "", ""}, false, false},
-        Todo{ Completed{ 5, day05, "", "", ""}, false, false},
+        Completed{ 4, day04, "Printing Department", "accessable paper rolls", "removable paper rolls"},
+        Completed{ 5, day05, "Cafeteria", "fresh ingredients", "possibly fresh ingridients"},
         Todo{ Completed{ 6, day06, "", "", ""}, false, false},
         Todo{ Completed{ 7, day07, "", "", ""}, false, false},
         Todo{ Completed{ 8, day08, "", "", ""}, false, false},
@@ -61,7 +61,87 @@ day09 :: dayXX
 day08 :: dayXX
 day07 :: dayXX
 day06 :: dayXX
-day05 :: dayXX
+
+day05 :: proc(path, test_path: string) -> (fresh_count, possibly_fresh_count: i64) {
+    lines := read_lines(path when !ODIN_DEBUG else test_path)
+    
+    Range :: struct { begin, end: i64 }
+    ranges: [dynamic] Range
+    
+    contains :: proc (r: Range, n: i64) -> bool { return n >= r.begin && n <= r.end  }
+    
+    ranges_done := false
+    for line in lines {
+        if line == "" { ranges_done = true; continue }
+        
+        if !ranges_done {
+            r: Range
+            rest := line
+            r.begin, rest = chop_number(rest)
+            rest = rest[1:] // -
+            r.end, _ = chop_number(rest)
+            append(&ranges, r)
+        } else {
+            i, _ := chop_number(line)
+            is_fresh := false
+        
+            for r in ranges {
+                if contains(r, i) {
+                    is_fresh = true
+                    break
+                }
+            }
+            
+            if is_fresh {
+                fresh_count += 1
+            }
+        }
+    }
+    
+    second: [dynamic] Range
+    for {
+        for &a in ranges {
+            for &b in ranges {
+                overlap := false
+                if contains(a, b.begin) && contains(a, b.end) {
+                    overlap = true
+                } else if contains(a, b.begin) || contains(a, b.end) {
+                    overlap = true
+                }
+                if overlap {
+                    a.begin = min(a.begin, b.begin)
+                    a.end   = max(a.end, b.end)
+                    b = a
+                }
+            }
+        }
+        
+        for a in ranges {
+            unique := true
+            for s in second {
+                if s == a {
+                    unique = false 
+                    break
+                }
+            }
+            
+            if unique {
+                append(&second, a)
+            }
+        }
+        
+        if len(second) == len(ranges) do break
+        ranges = second
+        second = make([dynamic] Range)
+    }
+    
+    for r in second {
+        possibly_fresh_count += r.end - r.begin + 1
+    }
+    
+    return
+}
+
 day04 :: proc(path, test_path: string) -> (part1, part2: i64) {
     lines := read_lines(path when !ODIN_DEBUG else test_path)
     
@@ -196,6 +276,11 @@ day03 :: proc(path, test_path: string) -> (max_2_joltage, max_12_joltage: i64) {
 day02 :: proc(path, test_path: string) -> (simple_invalid_id_sum, repeated_invalid_id_sum: i64) {
     line := read_file(path when !ODIN_DEBUG else test_path)
     
+    Sandwich :: struct {
+        space, repeat: i64,
+        value: i64,
+    }
+    
     add_space :: proc (s: i64, space: i64) -> i64 {
         result := s
         for _ in 0..<space {
@@ -215,6 +300,17 @@ day02 :: proc(path, test_path: string) -> (simple_invalid_id_sum, repeated_inval
     
     max_digit_count := count_digits(max(i64))
     
+    sandwiches: [dynamic] Sandwich
+    for repeat in cast(i64) 2..<8 {
+        for space in cast(i64) 0..=4 {
+            total_digit_count := 1 + (space + 1) * (repeat-1)
+            if total_digit_count > max_digit_count do continue
+            
+            sandwich := make_sandwich(space, repeat)
+            append(&sandwiches, Sandwich{ space = space, repeat = repeat, value = sandwich })
+        }
+    }
+    
     for len(line) != 0 {
         start, end: i64
         start, line = chop_number(line)
@@ -225,24 +321,18 @@ day02 :: proc(path, test_path: string) -> (simple_invalid_id_sum, repeated_inval
         for i in start..=end {
             digit_count := count_digits(i)
             
-            check_loop: for repeat in cast(i64) 2..<8 {
-                for space in cast(i64) 0..=4 {
-                    total_digit_count := 1 + (space + 1) * (repeat-1)
-                    if total_digit_count > max_digit_count do continue
+            check_loop: for s in sandwiches {
+                if i % s.value == 0 {
+                    pattern_width := (s.space+1)
+                    div, rem := digit_count / pattern_width, digit_count % pattern_width
                     
-                    sandwich := make_sandwich(space, repeat)
-                    
-                    pattern_width := (space+1)
-                    
-                    if digit_count % pattern_width == 0 && digit_count / pattern_width == repeat {
-                        if i % sandwich == 0 {
-                            if repeat == 2 {
-                                simple_invalid_id_sum += i
-                            }
-                            repeated_invalid_id_sum += i
-                            break check_loop
-                        } 
-                    }
+                    if rem == 0 && div == s.repeat {
+                        if s.repeat == 2 {
+                            simple_invalid_id_sum += i
+                        }
+                        repeated_invalid_id_sum += i
+                        break check_loop
+                    } 
                 }
             }
         }
