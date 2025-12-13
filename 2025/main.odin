@@ -4,6 +4,8 @@ import "base:intrinsics"
 import "core:fmt"
 import "core:os"
 import "core:strconv"
+import "core:slice"
+import "core:sort"
 
 Completed :: struct { num: int, func: proc(_,_:string)->(i64,i64), name, label1, label2: string }
 Todo      :: struct { using _: Completed, done1, done2: bool }
@@ -18,11 +20,11 @@ main :: proc() {
         Completed{ 5, day05, "Cafeteria", "fresh ingredients", "possibly fresh ingridients"},
         Completed{ 6, day06, "Trash Compactor", "regular grand total", "cephalopod grand total"},
         Completed{ 7, day07, "Laboratories", "beam splits", "timelines"},
-        Todo{ Completed{ 8, day08, "", "", ""}, false, false},
-        Todo{ Completed{ 9, day09, "", "", ""}, false, false},
-        Todo{ Completed{10, day10, "", "", ""}, false, false},
-        Todo{ Completed{11, day11, "", "", ""}, false, false},
-        Todo{ Completed{12, day12, "", "", ""}, false, false},
+        Completed{ 8, day08, "Playground", "top three circuits", "fully connected circuit"},
+        Todo{ Completed{ 9, day09, "", "", ""}, true, true},
+        Todo{ Completed{10, day10, "", "", ""}, true, true},
+        Todo{ Completed{11, day11, "", "", ""}, true, true},
+        Todo{ Completed{12, day12, "", "", ""}, true, true},
     }
 
     init_qpc()
@@ -59,7 +61,120 @@ day12 :: dayXX
 day11 :: dayXX
 day10 :: dayXX
 day09 :: dayXX
-day08 :: dayXX
+
+day08 :: proc(path, test_path: string) -> (top_three_circuits, fully_connected: i64) {
+    lines := read_lines(path when !ODIN_DEBUG else test_path)
+    
+    v3 :: [3] f32
+    JunctionBox :: struct {
+        p: v3,
+        circuit: int,
+    }
+    junctions: [dynamic] ^JunctionBox
+    
+    for line in lines {
+        rest := line
+        
+        box:= new(JunctionBox)
+        
+        box.p.x = cast(f32) chop_number(&rest)
+        eat(&rest, ",")
+        box.p.y = cast(f32) chop_number(&rest)
+        eat(&rest, ",")
+        box.p.z = cast(f32) chop_number(&rest)
+        
+        append(&junctions, box)
+        box.circuit = len(junctions)
+    }
+    
+    Distance :: struct {a, b: ^JunctionBox, distance_squared: f32 }
+    less_distance :: proc(a, b: Distance) -> bool { return a.distance_squared < b.distance_squared }
+    
+    distances: [dynamic] Distance
+    for &a, ai in junctions[:len(junctions)-1] {
+        for &b in junctions[ai+1:] {
+            d := b.p - a.p
+            
+            distance := Distance{
+                a, b, 
+                d.x * d.x + d.y * d.y + d.z * d.z
+            }
+            
+            append(&distances, distance)
+        }
+    }
+    
+    slice.sort_by(distances[:], less_distance)
+    
+    remaining_circuits := len(junctions)
+    
+    done1, done2: bool
+    
+    connection_count :: 10 when ODIN_DEBUG else 999
+    for d, connection_index in distances {
+        if d.a.circuit != d.b.circuit {
+            remaining_circuits -= 1
+            assert(remaining_circuits > 0)
+            if remaining_circuits == 1 {
+                done2 = true
+                fully_connected = cast(i64) d.a.p.x * cast(i64) d.b.p.x
+            }
+            
+            src_circuit := d.a.circuit
+            dst_circuit := d.b.circuit
+            for &box in junctions {
+                if box.circuit == src_circuit {
+                    box.circuit = dst_circuit
+                }
+            }
+        }
+        
+        if connection_index == connection_count {
+            done1 = true
+            
+            slice.sort_by(junctions[:], proc(a, b: ^JunctionBox) -> bool { return a.circuit < b.circuit })
+            
+            update_top_three :: proc (top_three: ^[3]i64, count: i64) {
+                if top_three[0] < count {
+                    top_three[2] = top_three[1]
+                    top_three[1] = top_three[0]
+                    top_three[0] = count
+                } else if top_three[1] < count {
+                    top_three[2] = top_three[1]
+                    top_three[1] = count
+                } else if top_three[2] < count {
+                    top_three[2] = count
+                }
+            }
+            
+            top_three: [3] i64
+            previous: int
+            count: i64 = 0
+            for box in junctions {
+                if previous != box.circuit {
+                    previous = box.circuit
+                    
+                    update_top_three(&top_three, count)
+                    count = 1
+                } else {
+                    count += 1
+                }
+            }
+            update_top_three(&top_three, count)
+            
+            top_three_circuits = 1
+            for top in top_three {
+                top_three_circuits *= top
+            }
+        }
+        
+        if done1 && done2 {
+            break
+        }
+    }
+    
+    return
+}
 
 day07 :: proc(path, test_path: string) -> (part1, part2: i64) {
     lines := read_lines(path when !ODIN_DEBUG else test_path)

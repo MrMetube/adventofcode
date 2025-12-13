@@ -97,7 +97,12 @@ chop_digit :: proc(view: ^string) -> (result: i64) {
     return
 }
 
-chop_number :: proc(view: string) -> (result: i64, rest: string) {
+chop_number :: proc { chop_number_mut, chop_number_ret }
+chop_number_mut :: proc(view: ^string) -> (result: i64) {
+    result, view^ = chop_number(view^)
+    return result
+}
+chop_number_ret :: proc(view: string) -> (result: i64, rest: string) {
     view := trim_left(view)
     cut := 0
     for r in view {
@@ -159,7 +164,11 @@ trim_until_number_ref :: proc(view: ^string) -> (chopped: i64, ok: bool) #option
     return chopped, false
 }
 
-eat :: proc(view: string, target: string) -> (rest: string) {
+eat :: proc { eat_mut, eat_ret } 
+eat_mut :: proc (view: ^string, target: string) {
+    view ^= eat(view^, target)
+}
+eat_ret :: proc(view: string, target: string) -> (rest: string) {
     cut := len(target)
     if view[:cut] == target {
         return view[cut:]
