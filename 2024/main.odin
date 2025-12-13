@@ -6,9 +6,7 @@ import "core:math"
 import "core:math/linalg"
 import "core:os"
 import "core:slice"
-import "core:strings"
 import "core:strconv"
-import "core:time"
 
 Completed :: struct { num: int, func: proc(_,_:string)->(i64,i64), name, label1, label2: string }
 Todo      :: struct { using _: Completed, done1, done2: bool }

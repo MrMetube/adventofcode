@@ -17,7 +17,7 @@ main :: proc() {
         Completed{ 4, day04, "Printing Department", "accessable paper rolls", "removable paper rolls"},
         Completed{ 5, day05, "Cafeteria", "fresh ingredients", "possibly fresh ingridients"},
         Completed{ 6, day06, "Trash Compactor", "regular grand total", "cephalopod grand total"},
-        Todo{ Completed{ 7, day07, "", "", ""}, false, false},
+        Completed{ 7, day07, "Laboratories", "beam splits", "timelines"},
         Todo{ Completed{ 8, day08, "", "", ""}, false, false},
         Todo{ Completed{ 9, day09, "", "", ""}, false, false},
         Todo{ Completed{10, day10, "", "", ""}, false, false},
@@ -60,14 +60,105 @@ day11 :: dayXX
 day10 :: dayXX
 day09 :: dayXX
 day08 :: dayXX
-day07 :: dayXX
+
+day07 :: proc(path, test_path: string) -> (part1, part2: i64) {
+    lines := read_lines(path when !ODIN_DEBUG else test_path)
+    CellKind :: enum {
+        Empty,
+        Splitter,
+    }
+    Cell :: struct {
+        kind: CellKind,
+        tachyon_count: i64,
+        is_start: bool,
+    }
+    
+    rows := len(lines)
+    cols := len(lines[0])
+    manifold := make([] Cell, rows * cols)
+    
+    for line, row in lines {
+        for slot, col in line {
+            cell: Cell
+            switch slot {
+            case '.': cell.kind = .Empty
+            case 'S': cell.kind = .Empty; cell.is_start = true; cell.tachyon_count = 1
+            case '^': cell.kind = .Splitter
+            }
+            manifold[row * cols + col] = cell
+        }
+    }
+    
+    dump_manifold :: proc (manifold: [] Cell, rows, cols: int) {
+        for row in 0..<rows {
+            for col in 0..<cols {
+                cell := manifold[row * cols + col]
+                symbol: rune
+                switch cell.kind {
+                case .Empty:    symbol = cell.is_start ? 'S' : '.'
+                case .Splitter: symbol = '^'
+                }
+                if cell.kind == .Empty && cell.tachyon_count > 0 {
+                    symbol = '|'
+                }
+                fmt.print(symbol)
+            }
+            fmt.print('\n')
+        }
+        fmt.print('\n')
+    }
+    
+    {
+        for row in 0..<rows {
+            for col in 0..<cols {
+                cell := &manifold[row * cols + col]
+                if cell.kind == .Empty && cell.tachyon_count > 0 {
+                    if in_bounds_2D(col, row+1, cols, rows) {
+                        down := &manifold[(row+1) * cols + col]
+                        down.tachyon_count += cell.tachyon_count
+                        
+                        switch down.kind {
+                        case .Empty: 
+                        case .Splitter:
+                            if in_bounds_2D(col-1, row+1, rows, cols) {
+                                down_l := &manifold[(row+1) * cols + (col-1)]
+                                assert(down_l.kind == .Empty)
+                                down_l.tachyon_count += cell.tachyon_count
+                            } 
+                            if in_bounds_2D(col+1, row+1, rows, cols) {
+                                down_r := &manifold[(row+1) * cols + (col+1)]
+                                assert(down_r.kind == .Empty)
+                                down_r.tachyon_count += cell.tachyon_count
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    for cell in manifold {
+        if cell.kind == .Splitter && cell.tachyon_count > 0 {
+            part1 += 1
+        }
+    }
+    
+    row := rows-1
+    for col in 0..<cols {
+        cell := manifold[row * cols + col]
+        if cell.kind == .Empty {
+            part2 += cell.tachyon_count
+        }
+    }
+    
+    return
+}
 
 day06 :: proc(path, test_path: string) -> (grand_total, cephalopod_total: i64) {
     lines := read_lines(path when !ODIN_DEBUG else test_path)
     
     { // part 1
         rests := make([]string, len(lines))
-        defer delete(rests)
         copy(rests[:], lines)
         
         outer: for {
@@ -193,8 +284,8 @@ day05 :: proc(path, test_path: string) -> (fresh_count, possibly_fresh_count: i6
         }
         
         if len(second) == len(ranges) do break
-        ranges = second
-        second = make([dynamic] Range)
+        swap(&second, &ranges)
+        clear(&second)
     }
     
     for r in second {
@@ -214,6 +305,7 @@ day04 :: proc(path, test_path: string) -> (part1, part2: i64) {
     cols := len(lines)
     rows := len(lines[0])
     paper_rolls := make([] PaperRoll, cols * rows)
+    
     for line, row in lines {
         for slot, col in line {
             paper_rolls[row * cols + col] = slot == '@' ? .Present : .Empty
@@ -457,7 +549,11 @@ do_day_raw :: proc(num:int, day_func: proc(path, test_path: string) -> (i64, i64
         test_path := fmt.tprintf("./data/%02d_test.txt", num)
         
         start := get_wall_clock()
-        d01_one, d01_two := day_func(path, test_path)
+        d1, d2: i64
+        {
+            context.allocator = context.temp_allocator
+            d1, d2 = day_func(path, test_path)
+        }
         elapsed := get_seconds_elapsed(start, get_wall_clock())
         
         fmt.printfln("Day % 2d: %v", num, name)
@@ -465,17 +561,19 @@ do_day_raw :: proc(num:int, day_func: proc(path, test_path: string) -> (i64, i64
         if !solved1 {
             fmt.print("  TODO:")
         }
-        fmt.printfln("  Part 1: %v (%v)", d01_one, label1)
+        fmt.printfln("  Part 1: %v (%v)", d1, label1)
         
         if !solved2 {
             fmt.print("  TODO:")
         }
-        fmt.printfln("  Part 2: %v (%v)", d01_two, label2)
+        fmt.printfln("  Part 2: %v (%v)", d2, label2)
 
         if elapsed < 1 {
             fmt.printfln("  %.3fms", elapsed*1000)
         } else {
             fmt.printfln("  %.3fs", elapsed)
         }
+        
+        free_all(context.temp_allocator)
     }
 }

@@ -23,8 +23,8 @@ count_digits :: proc (value: $T) -> (result: T) {
 // ---------------------- array functions
 // ---------------------- ---------------------- ----------------------
 
-in_bounds_2D :: proc (x,y: int, rows, cols: int) -> bool {
-    return x >= 0 && x < rows && y >= 0 && y < cols
+in_bounds_2D :: proc (x,y: int, cols, rows: int) -> bool {
+    return x >= 0 && x < cols && y >= 0 && y < rows
 }
 
 insert :: proc(array: ^[dynamic]$T, element: T, index: int) {
