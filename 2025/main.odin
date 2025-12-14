@@ -2,6 +2,7 @@ package main
 
 import "base:intrinsics"
 import "core:fmt"
+import "core:math"
 import "core:os"
 import "core:strconv"
 import "core:slice"
@@ -21,7 +22,7 @@ main :: proc() {
         Completed{ 6, day06, "Trash Compactor", "regular grand total", "cephalopod grand total"},
         Completed{ 7, day07, "Laboratories", "beam splits", "timelines"},
         Completed{ 8, day08, "Playground", "top three circuits", "fully connected circuit"},
-        Todo{ Completed{ 9, day09, "", "", ""}, true, true},
+        Completed{ 9, day09, "Movie Theater", "red tiles", "only green red tiles"},
         Todo{ Completed{10, day10, "", "", ""}, true, true},
         Todo{ Completed{11, day11, "", "", ""}, true, true},
         Todo{ Completed{12, day12, "", "", ""}, true, true},
@@ -60,7 +61,56 @@ dayXX :: proc(path, test_path: string) -> (part1, part2: i64) {
 day12 :: dayXX
 day11 :: dayXX
 day10 :: dayXX
-day09 :: dayXX
+
+day09 :: proc(path, test_path: string) -> (largest_area, largest_green_area: i64) {
+    lines := read_lines(path when !ODIN_DEBUG else test_path)
+    
+    v2 :: [2] i64
+    red_tiles := make([]v2, len(lines))
+    
+    for line, i in lines {
+        rest := line
+        t := &red_tiles[i]
+        t.x = chop_number(&rest)
+        eat(&rest, ",")
+        t.y = chop_number(&rest)
+    }
+    
+    only_contains_green :: proc (red_tiles: [] v2, p_min, p_max: v2) -> bool {
+        d := red_tiles[len(red_tiles)-1]
+        for c in red_tiles {
+            defer d = c
+            
+            t_min := v2{min(c.x, d.x), min(c.y, d.y)}
+            t_max := v2{max(c.x, d.x), max(c.y, d.y)}
+            
+            if t_min.x < p_max.x && t_max.x > p_min.x && t_min.y < p_max.y && t_max.y > p_min.y {
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+    for a, i in red_tiles {
+        for b in red_tiles {
+            min_corner := v2{min(a.x, b.x), min(a.y, b.y)}
+            max_corner := v2{max(a.x, b.x), max(a.y, b.y)}
+            delta := max_corner - min_corner + 1
+            area := delta.x * delta.y
+            
+            if largest_area < area {
+                largest_area = area
+            }
+            
+            if largest_green_area < area && only_contains_green(red_tiles, min_corner, max_corner) {
+                largest_green_area = area
+            }
+        }
+    }
+    
+    return
+}
 
 day08 :: proc(path, test_path: string) -> (top_three_circuits, fully_connected: i64) {
     lines := read_lines(path when !ODIN_DEBUG else test_path)
