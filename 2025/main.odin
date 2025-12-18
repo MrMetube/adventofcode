@@ -2,30 +2,26 @@ package main
 
 import "base:intrinsics"
 import "core:fmt"
-import "core:math"
 import "core:os"
 import "core:strconv"
 import "core:slice"
-import "core:sort"
 
-Completed :: struct { num: int, func: proc(_,_:string)->(i64,i64), name, label1, label2: string }
-Todo      :: struct { using _: Completed, done1, done2: bool }
-Day       :: union  { Completed, Todo }
+Day :: struct { using _ : struct { num: int, func: proc(_: string) -> (i64, i64), name, label1, label2: string}, todo1, todo2: bool }
 
 main :: proc() {
-    days := [?]Day{
-        Completed{ 1, day01, "Secret Entrance", "zeros ended on", "zeros passed"},
-        Completed{ 2, day02, "Gift Shop", "simple invalid ids", "repeated invalid ids"},
-        Completed{ 3, day03, "Lobby", "total 2 joltage", "total 12 joltage"},
-        Completed{ 4, day04, "Printing Department", "accessable paper rolls", "removable paper rolls"},
-        Completed{ 5, day05, "Cafeteria", "fresh ingredients", "possibly fresh ingridients"},
-        Completed{ 6, day06, "Trash Compactor", "regular grand total", "cephalopod grand total"},
-        Completed{ 7, day07, "Laboratories", "beam splits", "timelines"},
-        Completed{ 8, day08, "Playground", "top three circuits", "fully connected circuit"},
-        Completed{ 9, day09, "Movie Theater", "red tiles", "only green red tiles"},
-        Todo{ Completed{10, day10, "", "", ""}, true, true},
-        Todo{ Completed{11, day11, "", "", ""}, true, true},
-        Todo{ Completed{12, day12, "", "", ""}, true, true},
+    days := [?] Day {
+        { num =  1, func = day01, name = "Secret Entrance",     label1 = "zeros ended on",         label2 = "zeros passed"               },
+        { num =  2, func = day02, name = "Gift Shop",           label1 = "simple invalid ids",     label2 = "repeated invalid ids"       },
+        { num =  3, func = day03, name = "Lobby",               label1 = "total 2 joltage",        label2 = "total 12 joltage"           },
+        { num =  4, func = day04, name = "Printing Department", label1 = "accessable paper rolls", label2 = "removable paper rolls"      },
+        { num =  5, func = day05, name = "Cafeteria",           label1 = "fresh ingredients",      label2 = "possibly fresh ingridients" },
+        { num =  6, func = day06, name = "Trash Compactor",     label1 = "regular grand total",    label2 = "cephalopod grand total"     },
+        { num =  7, func = day07, name = "Laboratories",        label1 = "beam splits",            label2 = "timelines"                  },
+        { num =  8, func = day08, name = "Playground",          label1 = "top three circuits",     label2 = "fully connected circuit"    },
+        { num =  9, func = day09, name = "Movie Theater",       label1 = "red tiles",              label2 = "only green red tiles"       },
+        { num = 10, func = day10, name = "Factory",             label1 = "fewest button presses",  label2 = "",                          },
+        { num = 11, func = day11, name = "Reactor",             label1 = "",                       label2 = "",                          },
+        { num = 12, func = day12, name = "Christmas Tree Farm", label1 = "",                       label2 = "",                          },
     }
 
     init_qpc()
@@ -35,11 +31,11 @@ main :: proc() {
         num, _ := strconv.parse_int(os.args[1])
         do_day(days[num-1])
     } else {
-        start := get_wall_clock()
+        elapsed: f32
         for day in days {
-            do_day(day)
+            elapsed += do_day(day)
         }
-        elapsed := get_seconds_elapsed(start, get_wall_clock())
+        
         fmt.print("Total Time: ")
         if elapsed < 1 {
             fmt.printfln("%.3fms", elapsed * 1000)
@@ -49,9 +45,9 @@ main :: proc() {
     }
 }
 
-dayXX :: proc(path, test_path: string) -> (part1, part2: i64) {
-    line := read_file(path when !ODIN_DEBUG else test_path)
-    lines := read_lines(path when !ODIN_DEBUG else test_path)
+dayXX :: proc(path: string) -> (part1, part2: i64) {
+    line := read_file(path)
+    lines := read_lines(path)
     
     return
 }
@@ -60,10 +56,280 @@ dayXX :: proc(path, test_path: string) -> (part1, part2: i64) {
 
 day12 :: dayXX
 day11 :: dayXX
-day10 :: dayXX
 
-day09 :: proc(path, test_path: string) -> (largest_area, largest_green_area: i64) {
-    lines := read_lines(path when !ODIN_DEBUG else test_path)
+day10 :: proc(path: string) -> (part1, part2: i64) {
+    lines := read_lines(path)
+    
+    Lights :: u32
+    Machine :: struct {
+        target: Lights,
+        
+        switches: [dynamic] Lights,
+        joltages: [dynamic] i64,
+    }
+    
+    machines: [dynamic] Machine
+    
+    for line in lines {
+        m: Machine
+        
+        rest := line
+        eat(&rest, "[")
+        target: for shift: u32; rest[0] != ']'; shift += 1 {
+            if rest[0] == '#' {
+                m.target |= 1 << shift
+            }
+            rest = rest[1:]
+        }
+        eat(&rest, "] ")
+        
+        switches: for {
+            if rest[0] != '(' do break switches
+            eat(&rest, "(")
+            lswitch: Lights
+            for {
+                n := chop_number(&rest)
+                lswitch |= cast(Lights) 1 << cast(u32) n
+                if rest[0] == ')' do break
+                eat(&rest, ",")
+            }
+            append(&m.switches, lswitch)
+            
+            eat(&rest, ") ")
+        }
+        
+        eat(&rest, "{")
+        for {
+            n := chop_number(&rest)
+            append(&m.joltages, n)
+            if rest[0] == '}' do break
+            eat(&rest, ",")
+        }
+        eat(&rest, "}")
+        
+        append(&machines, m)
+    }
+    
+    System :: struct (a, b: i32) {
+        rows: [a] [b] f64,
+    }
+    solve :: proc (system: ^System($N, $M)) -> bool {
+        // the result will consist of a NxN Identity matrix followed by a column vector of the scalars
+        // i.e. row 0 will solve for col 0
+        for i in system.rows do fmt.printf("%v\n", i); fmt.printf("\n")
+        for target, target_column in system.rows[:len(system.rows)-1] {
+            if target[target_column] == 0 do return false
+            for &row in system.rows[target_column+1:] {
+                // eliminate the target column from all following rows
+                if row[target_column] != 0 {
+                    factor := -target[target_column] / row[target_column]
+                    row = target + row * factor
+                }
+            }
+            // for i in system.rows do fmt.printf("%v\n", i); fmt.printf("\n")
+        }
+        
+        last := len(system.rows[0])-1
+        
+        // we have the triangle, now make it the Identity
+        #reverse for &row, target_index in system.rows {
+            // Multiply out the other columns
+            #reverse for single, single_index in system.rows[target_index+1:] {
+                column := single_index + target_index + 1
+                
+                single := system.rows[column]
+                
+                if single[column] == 0 do return false
+                factor := single[last] / single[column]
+                
+                row[last] -= row[column] * factor
+                row[column] = 0
+            }
+        }
+        
+        // normalize the rows
+        for &row, index in system.rows {
+            row /= row[index]
+        }
+        return true
+    }
+
+    when false { // 3x3
+        I := System(3, 4) {{
+            { 4,-3, 1,-8},
+            {-2, 1,-3,-4},
+            { 1,-1, 2, 3},
+        }}
+        
+        solve(&I)
+        
+        for i in I.rows do fmt.printf("%v\n", i); fmt.printf("\n")
+    }
+    
+    when false { // 4x4
+        I := System(4, 5) {{
+            { 2, 1,-1, 2, 5},
+            { 4, 5,-3, 6, 9},
+            {-2, 5,-2, 6, 4},
+            { 4,11,-4, 8, 2},
+        }}
+        
+        solve(&I)
+        
+        for i in I.rows do fmt.printf("%v\n", i); fmt.printf("\n")
+    }
+    
+    when false { // 1
+        when true {
+            when !true {
+                N :: 5
+                s := [N]f64{7, 5, 12, 7, 2}
+                buttons := [?] [N] f64 {
+                    {1,0,1,1,1},
+                    {0,0,1,1,0},
+                    {1,0,0,0,1},
+                    {1,1,1,0,0},
+                    {0,1,1,1,1},
+                }
+            } else {
+                N :: 6
+                s := [N]f64{10, 11, 11, 5, 10, 5}
+                buttons := [?] [N] f64 {
+                    {1,1,1,1,1,0},
+                    {1,0,0,1,1,0},
+                    {1,1,1,0,1,1},
+                    {0,1,1,0,0,0},
+                }
+            }
+        } else {
+            N :: 4
+            s := [N]f64{3, 5, 4, 7}
+            
+            buttons:= [?] [N] f64 {
+                {0, 0, 0, 1},
+                {0, 1, 0, 1},
+                {0, 0, 1, 0},
+                {0, 0, 1, 1},
+                {1, 0, 1, 0},
+                {1, 1, 0, 0},
+            }
+        }
+        
+        
+        ps: [N][dynamic][N]f64
+        for b in buttons {
+            for i in 0..<N {
+                if b[i] != 0 do append(&ps[i], b)
+            }
+        }
+        
+        min := max(i64)
+        
+        indices: [N] int
+        loop: for {
+            system: System(N, N+1)
+            for &row, row_index in system.rows {
+                row[N] = s[row_index]
+            }
+            for &row, row_index in system.rows {
+                for i in 0..<N {
+                    index := indices[i]
+                    pis   := ps[i]
+                    pi    := pis[index]
+                    row[i] = pi[row_index]
+                }
+            }
+            
+            success := solve(&system)
+            
+            if success {
+                fmt.println("here")
+                for i in system.rows do fmt.printf("%v\n", i); fmt.printf("\n")
+                                
+                valid := true
+                for i in system.rows {
+                    x := i[N]
+                    valid &&= cast(f64) (cast(i64) x) == x
+                    valid &&= x >= 0
+                }
+                
+                if valid {
+                    sum: i64
+                    for i in system.rows {
+                        x := i[len(i)-1]
+                        sum += cast(i64) x
+                    }
+                    
+                    if min > sum {
+                        for i in system.rows do fmt.printf("%v\n", i); fmt.printf("\n")
+                        min = sum
+                    }
+                }
+            }
+            
+            increment: for i := N-1; i >= 0; i -= 1 {
+                indices[i] += 1
+                if indices[i] < len(ps[i]) {
+                    break increment
+                }
+                indices[i] = 0
+                if i == 0 do break loop
+            }
+        }
+        
+        if min != max(i64) {
+            part2 += min
+        } else {
+            fmt.println("no solutions found")
+        }
+    }
+    
+    LightsStep :: struct { lights: Lights, step: i64 }
+    todo: [dynamic] LightsStep
+    seen: map[Lights] i64
+    for &machine in machines {
+        clear(&todo)
+        clear(&seen)
+        
+        append(&todo, LightsStep{ 0, 0 })
+        seen[0] = 0
+        
+        success: bool
+        
+        search: for len(todo) != 0 {
+            current := pop_front(&todo)
+            
+            // fmt.printfln("%v: current: %6b, %v left", current.step, current.lights, len(todo))
+            for lswitch, lindex in machine.switches {
+                // fmt.printf("  switch %v %6b: ", lindex, lswitch)
+                next := current
+                next.lights ~= lswitch
+                next.step += 1
+                
+                if next.lights == machine.target {
+                    // fmt.printfln("new state %6b / %6b with delta %v", next.lights, machine.target, intrinsics.count_ones(next.lights ~ machine.target))
+                    // fmt.printfln("reached target in %v", next.step)
+                    part1 += next.step
+                    success = true
+                    break search
+                }
+                
+                if next.lights not_in seen {
+                    // fmt.printf("new state %6b / %6b with delta %v\n", next.lights, machine.target, intrinsics.count_ones(next.lights ~ machine.target))
+                    seen[next.lights] = next.step
+                    append(&todo, next)
+                }
+            }
+        }
+        
+        assert(success)
+    }
+    
+    return
+}
+
+day09 :: proc(path: string) -> (largest_area, largest_green_area: i64) {
+    lines := read_lines(path)
     
     v2 :: [2] i64
     red_tiles := make([]v2, len(lines))
@@ -112,8 +378,8 @@ day09 :: proc(path, test_path: string) -> (largest_area, largest_green_area: i64
     return
 }
 
-day08 :: proc(path, test_path: string) -> (top_three_circuits, fully_connected: i64) {
-    lines := read_lines(path when !ODIN_DEBUG else test_path)
+day08 :: proc(path: string) -> (top_three_circuits, fully_connected: i64) {
+    lines := read_lines(path)
     
     v3 :: [3] f32
     JunctionBox :: struct {
@@ -226,8 +492,8 @@ day08 :: proc(path, test_path: string) -> (top_three_circuits, fully_connected: 
     return
 }
 
-day07 :: proc(path, test_path: string) -> (part1, part2: i64) {
-    lines := read_lines(path when !ODIN_DEBUG else test_path)
+day07 :: proc(path: string) -> (part1, part2: i64) {
+    lines := read_lines(path)
     CellKind :: enum {
         Empty,
         Splitter,
@@ -319,8 +585,8 @@ day07 :: proc(path, test_path: string) -> (part1, part2: i64) {
     return
 }
 
-day06 :: proc(path, test_path: string) -> (grand_total, cephalopod_total: i64) {
-    lines := read_lines(path when !ODIN_DEBUG else test_path)
+day06 :: proc(path: string) -> (grand_total, cephalopod_total: i64) {
+    lines := read_lines(path)
     
     { // part 1
         rests := make([]string, len(lines))
@@ -380,8 +646,8 @@ day06 :: proc(path, test_path: string) -> (grand_total, cephalopod_total: i64) {
     return
 }
 
-day05 :: proc(path, test_path: string) -> (fresh_count, possibly_fresh_count: i64) {
-    lines := read_lines(path when !ODIN_DEBUG else test_path)
+day05 :: proc(path: string) -> (fresh_count, possibly_fresh_count: i64) {
+    lines := read_lines(path)
     
     Range :: struct { begin, end: i64 }
     ranges: [dynamic] Range
@@ -460,8 +726,8 @@ day05 :: proc(path, test_path: string) -> (fresh_count, possibly_fresh_count: i6
     return
 }
 
-day04 :: proc(path, test_path: string) -> (part1, part2: i64) {
-    lines := read_lines(path when !ODIN_DEBUG else test_path)
+day04 :: proc(path: string) -> (part1, part2: i64) {
+    lines := read_lines(path)
     
     PaperRoll :: enum {
         Empty, Present, Reachable
@@ -540,8 +806,8 @@ day04 :: proc(path, test_path: string) -> (part1, part2: i64) {
     return
 }
 
-day03 :: proc(path, test_path: string) -> (max_2_joltage, max_12_joltage: i64) {
-    lines := read_lines(path when !ODIN_DEBUG else test_path)
+day03 :: proc(path: string) -> (max_2_joltage, max_12_joltage: i64) {
+    lines := read_lines(path)
     
     row: [dynamic] i64
     for line in lines {
@@ -592,8 +858,8 @@ day03 :: proc(path, test_path: string) -> (max_2_joltage, max_12_joltage: i64) {
     return
 }
 
-day02 :: proc(path, test_path: string) -> (simple_invalid_id_sum, repeated_invalid_id_sum: i64) {
-    line := read_file(path when !ODIN_DEBUG else test_path)
+day02 :: proc(path: string) -> (simple_invalid_id_sum, repeated_invalid_id_sum: i64) {
+    line := read_file(path)
     
     Sandwich :: struct {
         space, repeat: i64,
@@ -660,8 +926,8 @@ day02 :: proc(path, test_path: string) -> (simple_invalid_id_sum, repeated_inval
     return
 }
 
-day01 :: proc(path, test_path:string) -> (zeros_ended_on, zeros_passed: i64){
-    lines := read_lines(path when !ODIN_DEBUG else test_path)
+day01 :: proc(path: string) -> (zeros_ended_on, zeros_passed: i64){
+    lines := read_lines(path)
     
     current: i64 =  50
     for line in lines {
@@ -701,44 +967,42 @@ day01 :: proc(path, test_path:string) -> (zeros_ended_on, zeros_passed: i64){
 
 ////////////////////////////////////////////////
 
-do_day :: proc{ do_day_switch, do_day_raw }
-do_day_switch :: proc(day: Day) {
-    switch v in day {
-        case Completed: do_day(v.num, v.func, v.name, v.label1, v.label2)
-        case Todo:      do_day(v.num, v.func, v.name, v.label1, v.label2, v.done1, v.done2)
+do_day :: proc(day: Day) -> (elapsed: f32) {
+    if day.func == dayXX do return 0
+    
+    path := fmt.tprintf("./data/%02d.txt", day.num) when !ODIN_DEBUG else fmt.tprintf("./data/%02d_test.txt", day.num)
+    
+    start := get_wall_clock()
+    d1, d2: i64
+    {
+        context.allocator = context.temp_allocator
+        d1, d2 = day.func(path)
     }
-}
-do_day_raw :: proc(num:int, day_func: proc(path, test_path: string) -> (i64, i64), name, label1, label2: string, solved1 := true, solved2 := true) {
-    if day_func != dayXX {
-        path      := fmt.tprintf("./data/%02d.txt", num)
-        test_path := fmt.tprintf("./data/%02d_test.txt", num)
-        
-        start := get_wall_clock()
-        d1, d2: i64
-        {
-            context.allocator = context.temp_allocator
-            d1, d2 = day_func(path, test_path)
-        }
-        elapsed := get_seconds_elapsed(start, get_wall_clock())
-        
-        fmt.printfln("Day % 2d: %v", num, name)
-       
-        if !solved1 {
-            fmt.print("  TODO:")
-        }
-        fmt.printfln("  Part 1: %v (%v)", d1, label1)
-        
-        if !solved2 {
-            fmt.print("  TODO:")
-        }
-        fmt.printfln("  Part 2: %v (%v)", d2, label2)
-
-        if elapsed < 1 {
-            fmt.printfln("  %.3fms", elapsed*1000)
-        } else {
-            fmt.printfln("  %.3fs", elapsed)
-        }
-        
-        free_all(context.temp_allocator)
+    elapsed = get_seconds_elapsed(start, get_wall_clock())
+    
+    fmt.printfln("Day % 2d: %v", day.num, day.name)
+    
+    fmt.print("  Part 1: ")
+    if day.todo1 {
+        fmt.printfln("TODO (%v)", day.label1)
+    } else {
+        fmt.printfln("%v (%v)", d1, day.label1)
     }
+    
+    fmt.print("  Part 2: ")
+    if day.todo2 {
+        fmt.printfln("TODO (%v)", day.label2)
+    } else {
+        fmt.printfln("%v (%v)", d2, day.label2)
+    }
+    
+    if elapsed < 1 {
+        fmt.printfln("  %.3fms", elapsed*1000)
+    } else {
+        fmt.printfln("  %.3fs", elapsed)
+    }
+    
+    free_all(context.temp_allocator)
+    
+    return elapsed
 }
