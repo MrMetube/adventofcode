@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package main
 
 // import time "../computer_enhance/haversine/perftime"

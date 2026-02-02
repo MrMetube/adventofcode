@@ -223,40 +223,15 @@ is_numeric :: proc(r: rune) -> bool {
 
 read_file :: proc(file: string) -> (result: string) {
 	data, ok := os.read_entire_file(file)
-    assert(ok)
+    assert(ok, fmt.tprintf("could not read file `%s`", file))
 	return string(data)
 }
 
 read_lines :: proc(file: string) -> (result: []string) {
 	data, ok := os.read_entire_file(file)
-    assert(ok)
+    assert(ok, fmt.tprintf("could not read file lines `%s`", file))
 	return strings.split_lines(string(data))
 }
-
-
-// ---------------------- ---------------------- ----------------------
-// ---------------------- timing
-// ---------------------- ---------------------- ----------------------
-
-
-@(private="file")
-GLOBAL_perf_counter_frequency : win.LARGE_INTEGER
-
-init_qpc :: #force_inline proc() {
-    win.QueryPerformanceFrequency(&GLOBAL_perf_counter_frequency)
-}
-
-get_wall_clock :: #force_inline proc() -> i64 {
-    assert(GLOBAL_perf_counter_frequency != 0)
-    result : win.LARGE_INTEGER
-    win.QueryPerformanceCounter(&result)
-    return cast(i64) result
-}
-
-get_seconds_elapsed :: #force_inline proc(start, end: i64) -> f32 {
-    return f32(end - start) / f32(GLOBAL_perf_counter_frequency)
-}
-
 
 // ---------------------- ---------------------- ----------------------
 

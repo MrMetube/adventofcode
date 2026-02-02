@@ -41,18 +41,14 @@ main :: proc() {
         Todo{{25, day25, "", "", ""}, false, false},
     }
 
-    init_qpc()
-    
     if len(os.args) >= 2 {
         assert(len(os.args) == 2, "bad argument")
         num := strconv.atoi(os.args[1])
         do_day(days[num-1])
     } else {
-        start := get_wall_clock()
         for day in days {
             do_day(day)
         }
-        elapsed := get_seconds_elapsed(start, get_wall_clock())
         fmt.print("Total Time: ")
         if elapsed < 1 {
             fmt.printfln("%.3fms", elapsed * 1000)
@@ -1619,9 +1615,7 @@ do_day_raw :: proc(num:int, day_func: proc(path, test_path: string) -> (i64, i64
         path      := fmt.tprintf("./data/%02d.txt", num)
         test_path := fmt.tprintf("./data/%02d_test.txt", num)
         
-        start := get_wall_clock()
         d01_one, d01_two := day_func(path, test_path)
-        elapsed := get_seconds_elapsed(start, get_wall_clock())
         
         fmt.printfln("Day % 2d: %v", num, name)
        

@@ -25,8 +25,6 @@ main :: proc() {
         { num = 12, func = day12, name = "Christmas Tree Farm", label1 = "",                       label2 = "",                          },
     }
 
-    init_qpc()
-    
     if len(os.args) >= 2 {
         assert(len(os.args) == 2, "bad argument")
         num, _ := strconv.parse_int(os.args[1])
@@ -995,13 +993,11 @@ do_day :: proc(day: Day) -> (elapsed: f32) {
     
     path := fmt.tprintf("./data/%02d.txt", day.num) when !ODIN_DEBUG else fmt.tprintf("./data/%02d_test.txt", day.num)
     
-    start := get_wall_clock()
     d1, d2: i64
     {
         context.allocator = context.temp_allocator
         d1, d2 = day.func(path)
     }
-    elapsed = get_seconds_elapsed(start, get_wall_clock())
     
     fmt.printfln("Day % 2d: %v", day.num, day.name)
     
@@ -1017,12 +1013,6 @@ do_day :: proc(day: Day) -> (elapsed: f32) {
         fmt.printfln("TODO (%v)", day.label2)
     } else {
         fmt.printfln("%v (%v)", d2, day.label2)
-    }
-    
-    if elapsed < 1 {
-        fmt.printfln("  %.3fms", elapsed*1000)
-    } else {
-        fmt.printfln("  %.3fs", elapsed)
     }
     
     free_all(context.temp_allocator)
