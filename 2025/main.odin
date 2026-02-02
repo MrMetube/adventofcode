@@ -4,6 +4,7 @@ import "base:intrinsics"
 import "core:fmt"
 import "core:os"
 import "core:strconv"
+import "core:strings"
 import "core:slice"
 
 Day :: struct { using _ : struct { num: int, func: proc(_: string) -> (i64, i64), name, label1, label2: string}, todo1, todo2: bool }
@@ -55,7 +56,29 @@ dayXX :: proc(path: string) -> (part1, part2: i64) {
 ////////////////////////////////////////////////
 
 day12 :: dayXX
-day11 :: dayXX
+
+day11 :: proc(path: string) -> (part1, part2: i64) {
+    lines := read_lines(path)
+    
+    devices: map[string] [] string
+    
+    for &line in lines {
+        fmt.println(line)
+        found, at := find(line, ":")
+        assert(found)
+        
+        name := line[:at]
+        line = line[at+1:]
+        
+        fmt.println(name, line)
+        
+        devices[name] = strings.split(line, " ")
+    }
+    
+    fmt.println(devices)
+    
+    return
+}
 
 day10 :: proc(path: string) -> (part1, part2: i64) {
     lines := read_lines(path)
